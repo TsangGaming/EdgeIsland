@@ -29,6 +29,7 @@ public static class IslandSmoke {
     [StructLayout(LayoutKind.Sequential)] public struct Rect { public int L,T,R,B; }
     [StructLayout(LayoutKind.Sequential)] public struct Point { public int X,Y; }
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls,string text);
+    public static IntPtr FindIsland() { return FindWindow("EdgeIsland.Overlay.1", null); }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr w, out Rect r);
     [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr w, out Rect r);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr w,uint msg,IntPtr wp,IntPtr lp);
@@ -77,7 +78,7 @@ function Choose-SetupLanguage([IntPtr]$Window, [int]$Language) {
     }
     Wizard-Command $Window 204 1  # CBN_SELCHANGE
 }
-function Find-Island { [IslandSmoke]::FindWindow('EdgeIsland.Overlay.1',$null) }
+function Find-Island { [IslandSmoke]::FindIsland() }
 function Read-Width {
     $r = [IslandSmoke+Rect]::new()
     if (-not [IslandSmoke]::GetWindowRect((Find-Island),[ref]$r)) { return 0 }
@@ -171,7 +172,19 @@ try {
     }
     if (-not (Test-Path $shortcut) -or (Get-ItemProperty -LiteralPath $arp).DisplayName -ne 'Edge Island') { throw 'Missing installation registration' }
     $app = Start-Process -FilePath (Join-Path $installed 'EdgeIsland.exe') -PassThru
-    Wait-Until { (Find-Island) -ne [IntPtr]::Zero -and (Test-Path $pref) } 'Overlay did not start'
+    try {
+        Wait-Until { (Find-Island) -ne [IntPtr]::Zero -and (Test-Path $pref) } 'Overlay did not start'
+    } catch {
+        $app.Refresh()
+        $window = Find-Island
+        Write-Host ("Overlay startup diagnostics: PID={0}; window={1}; preferencesExist={2}; processExited={3}" -f $app.Id, $window, (Test-Path -LiteralPath $pref), $app.HasExited)
+        if ($app.HasExited) {
+            Write-Host ("Overlay exit code: {0} (0x{0:X8})" -f $app.ExitCode)
+        } else {
+            Write-Host ("Overlay process session: {0}; smoke-test session: {1}; main window: {2}; title: {3}" -f $app.SessionId, ([System.Diagnostics.Process]::GetCurrentProcess()).SessionId, $app.MainWindowHandle, $app.MainWindowTitle)
+        }
+        throw
+    }
     Start-Sleep -Milliseconds 900
     $closed = Read-Width
     if ($null -ne (Startup-Entry)) { throw 'Login startup must default to off' }
