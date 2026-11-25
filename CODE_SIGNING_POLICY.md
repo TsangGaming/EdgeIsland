@@ -6,13 +6,15 @@ Edge Island v0.3.0 提供明确标注为 `UNSIGNED` 的测试版本。本项目�
 
 ## 负责人和授权
 
-提交申请前，仓库所有者应将下表中的待填项替换为真实 GitHub 用户名或可供核查的团队链接。维护者必须实际控制仓库、工作流及提交审批权限。每一位参与者在 GitHub 和 SignPath 均使用多因素认证。
+Edge Island 目前由独立开发者 TsangGaming 负责开发和维护，包括源代码、构建工作流、代码审核及签名审批。所有参与者必须在 GitHub 和 SignPath 使用多因素认证（MFA）。
 
 | 角色 | 权限与责任 | 实际人员 |
 | --- | --- | --- |
-| Authors / Committers | 维护产品、构建脚本与代码签名配置 | 待仓库所有者填写 |
-| Reviewers | 审核来自非直接提交者的变更，特别关注依赖、安装器和工作流 | 待仓库所有者填写 |
-| Approvers | 核对标签、提交、构建来源、版本及测试记录，在 SignPath 人工批准每次签名 | 待仓库所有者填写 |
+| Authors / Committers | 维护产品、构建脚本与代码签名配置 | [TsangGaming](https://github.com/TsangGaming) |
+| Reviewers | 审核代码变更，特别关注依赖、安装器和工作流 | [TsangGaming](https://github.com/TsangGaming) |
+| Approvers | 核对标签、提交、构建来源、版本及测试记录，在 SignPath 人工批准每次签名 | [TsangGaming](https://github.com/TsangGaming) |
+
+目前本项目由单一维护者负责，暂时没有其他独立代码审核人员。
 
 项目所有者应在申请时向基金会说明真实的团队结构。提交用 API token 仅获得提交权。生产审批和证书管理权由获准的维护者负责。
 
