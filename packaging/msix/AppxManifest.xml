@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+ xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:uap7="http://schemas.microsoft.com/appx/manifest/uap/windows10/7"
+ xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+ xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+ IgnorableNamespaces="uap uap7 desktop rescap">
+  <Identity Name="TsangGaming.EdgeIsland" Publisher="CN=519D7D56-0B43-4900-B8E9-3537D891A7FF" Version="0.3.0.0" ProcessorArchitecture="x64"/>
+  <Properties>
+    <DisplayName>EdgeIsland</DisplayName>
+    <PublisherDisplayName>TsangGaming</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0"/>
+  </Dependencies>
+  <Resources><Resource Language="en-us"/><Resource Language="zh-cn"/></Resources>
+  <Applications>
+    <Application Id="EdgeIsland" Executable="EdgeIsland.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="EdgeIsland" Description="A lightweight and customizable desktop overlay for Windows 11."
+       BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png"/>
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="EdgeIsland.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="EdgeIslandStartup" Enabled="false" DisplayName="EdgeIsland"/>
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <uap7:Capability Name="globalMediaControl"/>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+</Package>
