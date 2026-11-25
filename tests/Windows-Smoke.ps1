@@ -8,7 +8,15 @@ $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Edge Island.ln
 $arp = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\EdgeIsland'
 $pref = 'HKCU:\Software\EdgeIsland'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-function Startup-Entry { Get-ItemPropertyValue -LiteralPath $runKey -Name EdgeIsland -ErrorAction SilentlyContinue }
+function Startup-Entry {
+    if (-not (Test-Path -LiteralPath $runKey)) { return $null }
+    $key = Get-Item -LiteralPath $runKey -ErrorAction Stop
+    try {
+        return $key.GetValue('EdgeIsland', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    } finally {
+        $key.Dispose()
+    }
+}
 if ($null -ne (Startup-Entry)) { throw 'Use a test account without an existing Edge Island startup entry.' }
 foreach ($path in @($installed, $shortcut, $arp, $pref)) {
     if (Test-Path -LiteralPath $path) { throw "Use a clean test account. An existing Edge Island item is present at $path." }
