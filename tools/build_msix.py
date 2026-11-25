@@ -89,7 +89,7 @@ def main():
     stage.mkdir(parents=True)
     obj.mkdir(parents=True, exist_ok=True)
     common = ['/nologo', '/utf-8', '/O2', '/W3', '/MT', '/GS', '/guard:cf',
-              '/D_CRT_SECURE_NO_WARNINGS', '/DUNICODE', '/D_UNICODE']
+              '/D_CRT_SECURE_NO_WARNINGS', '/DUNICODE', '/D_UNICODE', '/DEDGE_STORE_MSIX=1']
     objects = []
     # Reuse the current production application source list, excluding the Run-key implementation.
     for path in build.SOURCES['app']:

@@ -75,7 +75,11 @@ static void load_settings(void)
     DWORD bytes = sizeof p, type = 0;
     island.locked = island.eco = island.hide_full = island.sound = island.first = 1;
     island.music_clock = island.hover_expand = 1;
+#ifdef EDGE_STORE_MSIX
+    island.startup = 0; /* Refresh asynchronously after creating the window. */
+#else
     island.startup = startup_registered();
+#endif
     island.anchor.edge = TOP;
     island.anchor.fraction = 5000;
     timer_select(&island.timer, 25);
@@ -588,13 +592,36 @@ static void reveal(void)
     ShowWindow(island.hwnd, SW_SHOWNORMAL);
     expand(1, HOME, 1);
 }
+#ifdef EDGE_STORE_MSIX
+/* UI thread owns the request state; the worker never waits on this thread. */
+static int store_startup_pending, store_startup_toggle_queued;
+static void store_startup_request(int toggle)
+{
+    if (store_startup_pending) {
+        if (toggle && store_startup_pending == 1) { store_startup_toggle_queued = 1; }
+        return;
+    }
+    if (startup_store_begin(island.hwnd, toggle)) {
+        store_startup_pending = toggle ? 2 : 1;
+    } else if (toggle) {
+        MessageBoxW(island.hwnd, TR(L"Could not start the Windows startup request.",
+                                   L"无法开始 Windows 登录启动请求。"), PRODUCT, MB_ICONINFORMATION);
+    }
+}
+#endif
 static void act(int id, int click_x)
 {
     int mins[] = {5, 15, 25, 50}, i;
     island.now = wall_ms();
     if (id >= A_HOME && id <= A_OPTIONS) {
         island.page = id - A_HOME;
-        if (island.page == OPTIONS) { island.startup = startup_registered(); }
+        if (island.page == OPTIONS) {
+#ifdef EDGE_STORE_MSIX
+            store_startup_request(0);
+#else
+            island.startup = startup_registered();
+#endif
+        }
         discard_transition();
         island.keyboard = A_NONE;
         tick(1);
@@ -686,11 +713,15 @@ static void act(int id, int click_x)
         break;
     }
     case A_STARTUP:
+#ifdef EDGE_STORE_MSIX
+        store_startup_request(1);
+#else
         if (!startup_set(!startup_registered())) {
             MessageBoxW(island.hwnd, TR(L"Could not change the Windows sign-in setting. Check the app path and your permissions.",
                                        L"无法更改登录启动设置。请检查程序路径和当前用户的权限。"), PRODUCT, MB_ICONINFORMATION);
         }
         island.startup = startup_registered();
+#endif
         break;
     case A_MONITOR:
         monitors();
@@ -1041,6 +1072,23 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case MSG_REBIND_AUDIO:
         audio_rebind();
         return 0;
+#ifdef EDGE_STORE_MSIX
+    case EDGE_STORE_STARTUP_RESULT: {
+        int was_toggle = store_startup_pending == 2;
+        store_startup_pending = 0;
+        if (wp == 1 || wp == 2) { island.startup = wp == 2; }
+        if (store_startup_toggle_queued) {
+            store_startup_toggle_queued = 0;
+            store_startup_request(1);
+        }
+        if (island.page == OPTIONS) { redraw(); }
+        if (was_toggle && !lp) {
+            MessageBoxW(hwnd, TR(L"Could not change startup. Check Settings > Apps > Startup in Windows, or try again.",
+                                L"无法更改开机启动。请检查 Windows 设置 > 应用 > 启动，或重试。"), PRODUCT, MB_ICONINFORMATION);
+        }
+        return 0;
+    }
+#endif
     case SHOW_MSG:
         reveal();
         return 0;
@@ -1143,6 +1191,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR args, int show)
         return 2;
     }
     taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
+#ifdef EDGE_STORE_MSIX
+    store_startup_request(0);
+#endif
     layout(0);
     tray_icon();
     audio_start(island.hwnd);
