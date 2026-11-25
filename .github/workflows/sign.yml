@@ -1,0 +1,97 @@
+name: Sign Windows release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: sign-edge-island-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  sign:
+    if: vars.SIGNPATH_ENABLED == 'true' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: windows-2022
+    environment: signpath-release
+    timeout-minutes: 310
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check tag against the compiled product version
+        id: version
+        shell: pwsh
+        run: |
+          $display = (Select-String -Path src/version.h -Pattern 'EDGE_DISPLAY_VERSION "([0-9.]+)"').Matches[0].Groups[1].Value
+          $version = "$display.0"
+          if ($env:GITHUB_REF_NAME -cne "v$display") { throw 'Tag does not match src/version.h' }
+          "value=$version" >> $env:GITHUB_OUTPUT
+      - name: Build the two inner executables from the tagged source
+        run: python tools/build.py --stage payload --release-candidate --out build/inner
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        id: inner
+        with:
+          name: unsigned-inner-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/inner/EdgeIsland.exe
+            build/inner/Uninstall.exe
+          if-no-files-found: error
+      - name: Request and retrieve signed application and uninstaller
+        uses: SignPath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: payload
+          github-artifact-id: ${{ steps.inner.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: build/signed-inner
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.value) }}
+      - name: Verify the signed inner files and build the outer installer
+        shell: pwsh
+        env:
+          EXPECTED_PUBLISHER: ${{ vars.SIGNPATH_EXPECTED_PUBLISHER }}
+        run: |
+          ./tools/Verify-Signatures.ps1 -Files @('build/signed-inner/EdgeIsland.exe','build/signed-inner/Uninstall.exe') -ExpectedPublisher $env:EXPECTED_PUBLISHER
+          python tools/build.py --stage setup --release-candidate --payload-dir build/signed-inner --out build/outer
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tools/verify.py --signed --outer-unsigned --setup build/outer/EdgeIslandSetup.exe --payload-dir build/signed-inner
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        id: outer
+        with:
+          name: unsigned-outer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/outer/EdgeIslandSetup.exe
+          if-no-files-found: error
+      - name: Request and retrieve signed installer
+        uses: SignPath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.outer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: build/signed-outer
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.value) }}
+      - name: Verify the final signed bytes, install and uninstall
+        shell: pwsh
+        env:
+          EXPECTED_PUBLISHER: ${{ vars.SIGNPATH_EXPECTED_PUBLISHER }}
+        run: |
+          ./tools/Verify-Signatures.ps1 -Files @('build/signed-outer/EdgeIslandSetup.exe','build/signed-inner/EdgeIsland.exe','build/signed-inner/Uninstall.exe') -ExpectedPublisher $env:EXPECTED_PUBLISHER
+          python tools/verify.py --signed --setup build/signed-outer/EdgeIslandSetup.exe --payload-dir build/signed-inner
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./tests/Windows-Smoke.ps1 -Setup build/signed-outer/EdgeIslandSetup.exe -PayloadDir build/signed-inner
+          python tools/bundle.py --signed --setup build/signed-outer/EdgeIslandSetup.exe --uninstaller build/signed-inner/Uninstall.exe --out build/downloads
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: EdgeIsland-${{ github.ref_name }}-x64-signed
+          path: build/downloads/
+          if-no-files-found: error
